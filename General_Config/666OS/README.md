@@ -8,5 +8,5 @@
 
 | 文件名 (Filename) | 大小 (Size) | 在线查看 (Link) |
 | :--- | :--- | :--- |
-| **MihomoPro_Config.yaml** | 24.9 KB | [查看配置](https://github.com/HenryChiao/mihomo_yamls/blob/main/General_Config/666OS/MihomoPro_Config.yaml) |
-| **OneTouch_Config.yaml** | 13.0 KB | [查看配置](https://github.com/HenryChiao/mihomo_yamls/blob/main/General_Config/666OS/OneTouch_Config.yaml) |
+| **MihomoPro_Config.yaml** | 24.3 KB | [查看配置](https://github.com/HenryChiao/mihomo_yamls/blob/main/General_Config/666OS/MihomoPro_Config.yaml) |
+| **OneTouch_Config.yaml** | 13.1 KB | [查看配置](https://github.com/HenryChiao/mihomo_yamls/blob/main/General_Config/666OS/OneTouch_Config.yaml) |

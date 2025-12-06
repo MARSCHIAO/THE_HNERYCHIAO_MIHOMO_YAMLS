@@ -9,4 +9,4 @@
 | 文件名 (Filename) | 大小 (Size) | 在线查看 (Link) |
 | :--- | :--- | :--- |
 | **OneSmart_Config.yaml** | 21.4 KB | [查看配置](https://github.com/HenryChiao/mihomo_yamls/blob/main/Smart_Mode/666OS/OneSmart_Config.yaml) |
-| **OneSmart_Lite_Config.yaml** | 13.1 KB | [查看配置](https://github.com/HenryChiao/mihomo_yamls/blob/main/Smart_Mode/666OS/OneSmart_Lite_Config.yaml) |
+| **OneSmart_Lite_Config.yaml** | 13.2 KB | [查看配置](https://github.com/HenryChiao/mihomo_yamls/blob/main/Smart_Mode/666OS/OneSmart_Lite_Config.yaml) |
