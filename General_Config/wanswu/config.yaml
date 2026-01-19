@@ -349,8 +349,8 @@ rules:
   - RULE-SET,China,直接连接
 
   # IP规则集-按照优先级顺序排列
-  - RULE-SET,LanIP,直接连接,no-resolve
-  - RULE-SET,ChinaIP,直接连接,no-resolve
+  - RULE-SET,LanIP,直接连接
+  - RULE-SET,ChinaIP,直接连接
   - RULE-SET,GoogleIP,Google,no-resolve
   - RULE-SET,TelegramIP,Telegram,no-resolve
   - RULE-SET,TwitterIP,Twitter,no-resolve
