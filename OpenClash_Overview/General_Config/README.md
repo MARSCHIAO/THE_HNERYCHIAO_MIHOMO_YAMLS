@@ -25,7 +25,9 @@
 | `liandu2024/clash-fallback-dialer.conf` | OpenClash 覆写配置 |
 | `liandu2024/clash-fallback-std.conf` | OpenClash 覆写配置 |
 | `liandu2024/clash-fallback.conf` | OpenClash 覆写配置 |
+| `liuran001/config.conf` | OpenClash 覆写配置 |
 | `qichiyuhub/config.conf` | OpenClash 覆写配置 |
+| `wanswu/config.conf` | OpenClash 覆写配置 |
 | `yyhhyyyyyy/mihomo_multi.conf` | OpenClash 覆写配置 |
 | `yyhhyyyyyy/mihomo_single.conf` | OpenClash 覆写配置 |
 

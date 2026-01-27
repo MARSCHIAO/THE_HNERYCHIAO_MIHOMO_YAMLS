@@ -7,6 +7,7 @@
 | 文件路径 | 说明 |
 | :--- | :--- |
 | `AkashaProxy/akasha_config.conf` | OpenClash 覆写配置 |
+| `AkashaProxy/config.conf` | OpenClash 覆写配置 |
 | `BoxProxy/config.conf` | OpenClash 覆写配置 |
 | `ClashMix/config.conf` | OpenClash 覆写配置 |
 | `Surfing/config.conf` | OpenClash 覆写配置 |
