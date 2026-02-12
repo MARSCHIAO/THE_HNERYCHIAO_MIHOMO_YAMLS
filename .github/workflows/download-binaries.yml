@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         include:
-          # Linux平台
+          # Linux平台（所有mihomo版本都支持）
           - { platform: linux, arch: amd64-v1 }
           - { platform: linux, arch: amd64-v3 }
           - { platform: linux, arch: armv5 }
@@ -32,14 +32,14 @@ jobs:
           - { platform: linux, arch: mips-softfloat }
           - { platform: linux, arch: mipsle-softfloat }
           - { platform: linux, arch: mipsle-hardfloat }
-          # Windows平台
+          # Windows平台（所有mihomo版本都支持）
           - { platform: windows, arch: amd64-v1 }
           - { platform: windows, arch: amd64-v3 }
           - { platform: windows, arch: arm64 }
-          # macOS平台
+          # macOS平台（Meta和Alpha支持，Smart可能不支持）
           - { platform: darwin, arch: amd64 }
           - { platform: darwin, arch: arm64 }
-          # Android平台
+          # Android平台（仅Meta和Alpha支持，Smart不支持）
           - { platform: android, arch: arm64 }
           - { platform: android, arch: armv7 }
           - { platform: android, arch: amd64 }
@@ -53,7 +53,7 @@ jobs:
         run: |
           mkdir -p ./artifacts ./tmp
           
-          # 设置下载URL和文件名模式
+          # 设置下载URL
           case "${{ inputs.variant }}" in
             meta)
               BASE_URL="https://github.com/MetaCubeX/mihomo/releases/download/${{ inputs.version }}"
@@ -70,39 +70,87 @@ jobs:
               ;;
           esac
           
-          # mihomo 的发布文件名格式: mihomo-platform-arch-version
+          # 构建文件名前缀
           FILE_PREFIX="mihomo-${{ matrix.platform }}-${{ matrix.arch }}"
+          
+          # 尝试下载，失败则记录但不终止
+          set +e
           
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             URL="${BASE_URL}/${FILE_PREFIX}-${{ inputs.version }}.gz"
-            echo "下载: $URL"
-            curl -fSL --max-time 300 "$URL" | gunzip -c > ./tmp/mihomo
-            chmod +x ./tmp/mihomo
-            SOURCE_FILE="./tmp/mihomo"
+            echo "尝试下载: $URL"
+            curl -fSL --max-time 300 "$URL" | gunzip -c > ./tmp/mihomo 2>/dev/null
+            if [[ $? -eq 0 && -s ./tmp/mihomo ]]; then
+              chmod +x ./tmp/mihomo
+              SOURCE_FILE="./tmp/mihomo"
+            else
+              echo "警告: Linux ${{ matrix.arch }} 下载失败或文件为空，跳过"
+              exit 0
+            fi
+            
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             URL="${BASE_URL}/${FILE_PREFIX}-${{ inputs.version }}.zip"
-            echo "下载: $URL"
-            curl -fSL --max-time 300 -o ./tmp/download.zip "$URL"
-            unzip -q ./tmp/download.zip -d ./tmp/
-            SOURCE_FILE=$(find ./tmp -name "*.exe" | head -n1)
-            if [[ -z "$SOURCE_FILE" ]]; then
-              echo "错误: 找不到exe文件"
-              exit 1
+            echo "尝试下载: $URL"
+            curl -fSL --max-time 300 -o ./tmp/download.zip "$URL" 2>/dev/null
+            if [[ $? -eq 0 && -s ./tmp/download.zip ]]; then
+              unzip -q ./tmp/download.zip -d ./tmp/ 2>/dev/null
+              SOURCE_FILE=$(find ./tmp -name "*.exe" | head -n1)
+              if [[ -z "$SOURCE_FILE" ]]; then
+                echo "警告: Windows ${{ matrix.arch }} 解压后找不到exe，跳过"
+                exit 0
+              fi
+            else
+              echo "警告: Windows ${{ matrix.arch }} 下载失败，跳过"
+              exit 0
             fi
+            
           elif [[ "${{ matrix.platform }}" == "darwin" ]]; then
-            # macOS 通常是 gz 格式
+            # macOS可能是gz或zip格式，先尝试gz
             URL="${BASE_URL}/${FILE_PREFIX}-${{ inputs.version }}.gz"
-            echo "下载: $URL"
-            curl -fSL --max-time 300 "$URL" | gunzip -c > ./tmp/mihomo
-            chmod +x ./tmp/mihomo
-            SOURCE_FILE="./tmp/mihomo"
+            echo "尝试下载: $URL"
+            curl -fSL --max-time 300 "$URL" | gunzip -c > ./tmp/mihomo 2>/dev/null
+            if [[ $? -eq 0 && -s ./tmp/mihomo ]]; then
+              chmod +x ./tmp/mihomo
+              SOURCE_FILE="./tmp/mihomo"
+            else
+              # 尝试zip格式
+              URL="${BASE_URL}/${FILE_PREFIX}-${{ inputs.version }}.zip"
+              echo "尝试下载zip: $URL"
+              curl -fSL --max-time 300 -o ./tmp/download.zip "$URL" 2>/dev/null
+              if [[ $? -eq 0 && -s ./tmp/download.zip ]]; then
+                unzip -q ./tmp/download.zip -d ./tmp/ 2>/dev/null
+                SOURCE_FILE=$(find ./tmp -type f ! -name "*.zip" | head -n1)
+                if [[ -n "$SOURCE_FILE" ]]; then
+                  chmod +x "$SOURCE_FILE" 2>/dev/null || true
+                else
+                  echo "警告: macOS ${{ matrix.arch }} 解压后找不到文件，跳过"
+                  exit 0
+                fi
+              else
+                echo "警告: macOS ${{ matrix.arch }} 下载失败，跳过"
+                exit 0
+              fi
+            fi
+            
           elif [[ "${{ matrix.platform }}" == "android" ]]; then
-            # Android 通常是 gz 格式
             URL="${BASE_URL}/${FILE_PREFIX}-${{ inputs.version }}.gz"
-            echo "下载: $URL"
-            curl -fSL --max-time 300 "$URL" | gunzip -c > ./tmp/mihomo
-            chmod +x ./tmp/mihomo
-            SOURCE_FILE="./tmp/mihomo"
+            echo "尝试下载: $URL"
+            curl -fSL --max-time 300 "$URL" | gunzip -c > ./tmp/mihomo 2>/dev/null
+            if [[ $? -eq 0 && -s ./tmp/mihomo ]]; then
+              chmod +x ./tmp/mihomo
+              SOURCE_FILE="./tmp/mihomo"
+            else
+              echo "警告: Android ${{ matrix.arch }} 下载失败，跳过"
+              exit 0
+            fi
+          fi
+          
+          set -e
+          
+          # 验证源文件
+          if [[ -z "$SOURCE_FILE" ]] || [[ ! -f "$SOURCE_FILE" ]]; then
+            echo "错误: 源文件不存在"
+            exit 0
           fi
           
           # 调用处理脚本
@@ -120,3 +168,4 @@ jobs:
           name: ${{ inputs.project }}-${{ inputs.variant }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./artifacts/*
           retention-days: 1
+        if: ${{ hashFiles('./artifacts/*') != '' }}
