@@ -1,9 +1,9 @@
 name: Update All GeoData Assets
 
 on:
-  workflow_dispatch: # 手动触发
+  workflow_dispatch:
   schedule:
-    - cron: '0 20 * * *' # 每天北京时间凌晨 4 点 (UTC 20:00)
+    - cron: '0 20 * * *' # 北京时间 04:00
   push:
     branches:
       - main
@@ -14,30 +14,53 @@ permissions:
   contents: write
 
 jobs:
-  download-sort-push:
+  process-and-publish:
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 使用 GH CLI 必须配置 Token
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TZ: Asia/Shanghai
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # --- 步骤 0: 准备历史数据 (用于差异对比) ---
+      - name: Fetch old stats
+        continue-on-error: true
+        run: |
+          # 尝试获取远程 GeoData 分支的 stats.json 用于对比
+          mkdir -p old_data
+          git ls-remote --exit-code --heads origin GeoData
+          if [ $? -eq 0 ]; then
+             git archive --remote=origin GeoData stats.json | tar -x -C old_data || echo "No stats.json found"
+          fi
+
+      # --- 步骤 1: 安装必要工具 ---
+      - name: Setup Go and Tools
+        run: |
+          echo "🛠️ Installing v2fly tools..."
+          go install -v github.com/v2fly/geoip/geoip@latest
+          go install -v github.com/v2fly/domain-list-community/domain-list-community@latest
+          
+          # 将 GOPATH/bin 加入路径，并重命名 domain-list-community 方便调用
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          sudo ln -s $(go env GOPATH)/bin/domain-list-community /usr/local/bin/geosite
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # --- 步骤 2: 下载与整理 (保留你原有的逻辑) ---
       - name: Download and Sort Assets
         run: |
-          # 定义整理函数：根据文件名移动到对应子文件夹
           function sort_files() {
             local author_dir=$1
             cd "$author_dir" || return
-
-            # 创建分类文件夹
             mkdir -p geoip geosite asn uncategorized
-
-            # 遍历当前目录下所有文件 (排除目录本身)
             find . -maxdepth 1 -type f | while read file; do
               filename=$(basename "$file")
-              # 转换为小写以便匹配
               lower_name=$(echo "$filename" | tr '[:upper:]' '[:lower:]')
-
               if [[ "$lower_name" == *"geoip"* ]] || [[ "$lower_name" == *".mmdb"* ]]; then
                 mv "$filename" geoip/
               elif [[ "$lower_name" == *"geosite"* ]] || [[ "$lower_name" == *"dlc.dat"* ]]; then
@@ -45,80 +68,73 @@ jobs:
               elif [[ "$lower_name" == *"asn"* ]]; then
                 mv "$filename" asn/
               else
-                # 剩下的放入未分类 (通常是校验文件或说明文档)
                 mv "$filename" uncategorized/
               fi
             done
-            
-            # 删除空文件夹 (如果某个分类没有文件)
             rmdir geoip geosite asn uncategorized 2>/dev/null || true
             cd - > /dev/null
           }
 
-          # 创建临时工作区
           mkdir -p workspace
           cd workspace
 
-          echo "🚀 开始批量下载..."
-
-          # --- 1. MetaCubeX (Tag: latest) ---
-          echo "⬇️ Downloading MetaCubeX..."
-          mkdir -p MetaCubeX
-          gh release download latest --repo MetaCubeX/meta-rules-dat --dir MetaCubeX --pattern "*" --clobber
+          echo "🚀 Downloading MetaCubeX..."
+          mkdir -p MetaCubeX && gh release download latest --repo MetaCubeX/meta-rules-dat --dir MetaCubeX --pattern "*" --clobber
           sort_files "$(pwd)/MetaCubeX"
 
-          # --- 2. DustinWin (Tag: mihomo-geodata) ---
-          echo "⬇️ Downloading DustinWin..."
-          mkdir -p DustinWin
-          gh release download mihomo-geodata --repo DustinWin/ruleset_geodata --dir DustinWin --pattern "*" --clobber
+          echo "🚀 Downloading DustinWin..."
+          mkdir -p DustinWin && gh release download mihomo-geodata --repo DustinWin/ruleset_geodata --dir DustinWin --pattern "*" --clobber
           sort_files "$(pwd)/DustinWin"
 
-          # --- 3. NobyDa (Tag: latest) ---
-          echo "⬇️ Downloading NobyDa..."
-          mkdir -p NobyDa
-          gh release download --repo NobyDa/geoip --dir NobyDa --pattern "*" --clobber
+          echo "🚀 Downloading NobyDa..."
+          mkdir -p NobyDa && gh release download --repo NobyDa/geoip --dir NobyDa --pattern "*" --clobber
           sort_files "$(pwd)/NobyDa"
 
-          # --- 4. Loyalsoldier (Tag: latest, Multi-repo) ---
-          echo "⬇️ Downloading Loyalsoldier..."
+          echo "🚀 Downloading Loyalsoldier..."
           mkdir -p Loyalsoldier
-          # 下载 repo 1: v2ray-rules-dat (通常包含最全的 dat)
           gh release download --repo Loyalsoldier/v2ray-rules-dat --dir Loyalsoldier --pattern "*" --clobber
-          # 下载 repo 2: geoip (可能会覆盖上面的同名文件，以最后下载的为准)
           gh release download --repo Loyalsoldier/geoip --dir Loyalsoldier --pattern "*" --clobber
           sort_files "$(pwd)/Loyalsoldier"
 
-          # --- 5. xream (Tag: latest) ---
-          echo "⬇️ Downloading xream..."
-          mkdir -p xream
-          gh release download --repo xream/geoip --dir xream --pattern "*" --clobber
+          echo "🚀 Downloading xream..."
+          mkdir -p xream && gh release download --repo xream/geoip --dir xream --pattern "*" --clobber
           sort_files "$(pwd)/xream"
 
-          echo "✅ 所有文件下载并分类完毕。"
-
-      - name: Push to GeoData Branch
+      # --- 步骤 3: 核心处理 (解包、统计、生成 README) ---
+      - name: Process Data & Generate Report
         run: |
-          # 准备推送环境
+          # 运行 Python 脚本处理数据
+          python3 .github/scripts/analyze_geodata.py
+
+      # --- 步骤 4: 推送 (使用你提供的参考逻辑) ---
+      - name: Git push assets to "GeoData" branch
+        run: |
+          # 将生成的内容移动到 push 目录
+          mkdir -p push
+          cp -r workspace/* push/
+          
+          cd push || exit 1
+          
+          # 初始化 git (孤儿分支模式)
+          git init
           git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-
-          # 切换到孤儿分支 GeoData (无历史记录，纯净模式)
-          git checkout --orphan GeoData
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          # 清空暂存区和当前目录
-          git rm -rf .
+          # 这里的 -b GeoData 对应你原有的分支名，保持订阅链接不变
+          git checkout -b GeoData
           
-          # 将 workspace 中的内容移出来
-          cp -r workspace/* .
-          rm -rf workspace
-
-          # 添加文件
           git add .
+          git commit -m "Auto Update Assets & Report: $(date +'%Y-%m-%d %H:%M:%S')"
+          
+          git remote add origin "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+          git push -f origin GeoData
 
-          # 检查是否有文件变化
-          if git diff --staged --quiet; then
-            echo "没有文件更新，跳过提交。"
-          else
-            git commit -m "Auto-update assets: $(date +'%Y-%m-%d %H:%M:%S')"
-            git push -f origin GeoData
-          fi
+      # --- 步骤 5: 刷新 CDN (参考逻辑) ---
+      - name: Purge jsdelivr CDN
+        continue-on-error: true
+        run: |
+          # 只刷新根目录的 README 和关键 stats.json，避免遍历成千上万个文件导致超时
+          curl -i "https://purge.jsdelivr.net/gh/${{ github.repository }}@GeoData/README.md"
+          curl -i "https://purge.jsdelivr.net/gh/${{ github.repository }}@GeoData/stats.json"
+          
+          # 如果需要刷新特定文件，可以在这里添加
